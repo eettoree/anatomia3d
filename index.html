@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Anatomy Pro - iOS Fix</title>
+    <title>Anatomy Pro - Perfect Pinch</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', sans-serif; }
         
@@ -11,31 +11,33 @@
             position: absolute; top: 10px; left: 10px; z-index: 10;
             color: white; background: rgba(0,0,0,0.85); padding: 15px; 
             border-radius: 12px; border-left: 4px solid #00d2ff;
-            max-width: 200px; backdrop-filter: blur(8px);
+            min-width: 220px; backdrop-filter: blur(8px);
             pointer-events: none;
-            font-size: 0.8rem; /* Più piccolo per mobile */
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            font-size: 0.9rem;
         }
-        h2 { margin: 0 0 5px 0; font-size: 1rem; text-transform: uppercase; color: #00d2ff; }
+        h2 { margin: 0 0 10px 0; font-size: 1.1rem; text-transform: uppercase; color: #00d2ff; letter-spacing: 1px; }
         
-        .status-row { display: flex; align-items: center; margin-bottom: 5px; color: #aaa; }
-        .active { color: #fff; font-weight: bold; }
+        .status-row { display: flex; align-items: center; margin-bottom: 6px; color: #aaa; }
+        .status-icon { width: 25px; text-align: center; margin-right: 10px; font-weight: bold; }
+        .active { color: #fff; text-shadow: 0 0 10px white; font-weight: bold; }
 
         #current-state {
-            margin-top: 10px; padding: 5px; background: #222; border-radius: 4px;
-            text-align: center; font-weight: bold; border: 1px solid #444;
+            margin-top: 10px; padding: 8px; background: #222; border-radius: 6px;
+            text-align: center; font-weight: bold; font-size: 1rem; border: 1px solid #444;
+            transition: all 0.3s;
         }
-        .st-idle { color: #888; }
-        .st-explode { color: #00d2ff; }
-        .st-grab { color: #ff0055; }
+        .st-idle { color: #888; border-color: #888; }
+        .st-explode { color: #00d2ff; border-color: #00d2ff; background: rgba(0, 210, 255, 0.1); }
+        .st-grab { color: #ff0055; border-color: #ff0055; background: rgba(255, 0, 85, 0.1); box-shadow: 0 0 20px rgba(255,0,85,0.4); }
 
-        #selected-part { color: #ffff00; font-weight: bold; margin-top: 5px; text-align: center; }
+        #selected-part { color: #ffff00; font-weight: bold; margin-top: 5px; min-height: 1.2em; text-align: center; }
 
-        /* Console Errori Visiva per Mobile */
         #debug-console {
             position: absolute; bottom: 0; left: 0; width: 100%; max-height: 100px;
             background: rgba(50,0,0,0.8); color: #ffaaaa; font-family: monospace;
             font-size: 10px; overflow-y: scroll; z-index: 999; pointer-events: none;
-            display: none; /* Appare solo se ci sono errori */
+            display: none;
         }
 
         #video-container {
@@ -43,14 +45,13 @@
             width: 120px; height: 160px; border-radius: 12px; overflow: hidden;
             border: 2px solid #333; transform: scaleX(-1); opacity: 0.5;
         }
-        /* FIX IMPORTANTE PER IOS: Video deve riempire il container */
         video { width: 100%; height: 100%; object-fit: cover; }
 
         #loader {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            color: #00d2ff; font-size: 1.2rem; font-weight: bold;
-            background: #111; padding: 30px; border: 1px solid #00d2ff; border-radius: 50%;
-            width: 150px; height: 150px; display: flex; align-items: center; justify-content: center;
+            color: #00d2ff; font-size: 1.5rem; font-weight: bold;
+            background: #111; padding: 40px; border: 1px solid #00d2ff; border-radius: 50%;
+            width: 200px; height: 200px; display: flex; align-items: center; justify-content: center;
             box-shadow: 0 0 50px rgba(0, 210, 255, 0.2); z-index: 100; text-align: center;
         }
     </style>
@@ -68,14 +69,14 @@
 </head>
 <body>
 
-    <div id="loader">Avvio<br>Camera...</div>
+    <div id="loader">Caricamento...</div>
     <div id="debug-console"></div>
 
     <div id="ui">
-        <h2>Mobile Controller</h2>
-        <div class="status-row" id="row-idle">✊ Unisci</div>
-        <div class="status-row" id="row-explode">🖐️ Esplodi</div>
-        <div class="status-row" id="row-grab">👌 Zoom/Pinch</div>
+        <h2>Anatomy Controller</h2>
+        <div class="status-row" id="row-idle"><div class="status-icon">✊</div> Chiusa: Ruota Tutto</div>
+        <div class="status-row" id="row-explode"><div class="status-icon">🖐️</div> Aperta: Esplodi (Drag)</div>
+        <div class="status-row" id="row-grab"><div class="status-icon">👌</div> Pinch: Muovi Z</div>
         
         <div id="current-state" class="st-idle">ATTESA</div>
         <div id="selected-part">...</div>
@@ -91,23 +92,20 @@
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
-        // --- SISTEMA DI LOGGING PER MOBILE ---
         function logError(msg) {
             const consoleDiv = document.getElementById('debug-console');
             consoleDiv.style.display = 'block';
             consoleDiv.innerHTML += `<div>> ${msg}</div>`;
             console.error(msg);
         }
-        window.onerror = function(message, source, lineno, colno, error) {
-            logError(message);
-        };
+        window.onerror = function(message) { logError(message); };
 
         // --- 1. SETUP AMBIENTE ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x050505);
         
         const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 300);
-        camera.position.set(0, 0, 14); // Leggermente più lontano per schermi piccoli
+        camera.position.set(0, 0, 12); 
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -115,10 +113,13 @@
         document.body.appendChild(renderer.domElement);
 
         // Luci
-        scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.3));
         const mainLight = new THREE.DirectionalLight(0xffffff, 2);
         mainLight.position.set(5, 5, 5);
         scene.add(mainLight);
+        const rimLight = new THREE.SpotLight(0x00d2ff, 5);
+        rimLight.position.set(-5, 5, -2);
+        scene.add(rimLight);
 
         const pivotGroup = new THREE.Group();
         scene.add(pivotGroup);
@@ -130,14 +131,19 @@
         cursorMesh.renderOrder = 999; 
         scene.add(cursorMesh);
 
-        // --- 2. LOGICA ---
+
+        // --- 2. DATI LOGICI ---
         let partsData = [];
         const STATE = { IDLE: 'idle', EXPLODE: 'explode', GRAB: 'grab' };
         let currentState = STATE.IDLE;
         
         let grabbedObject = null;
         let hoveredObject = null;
-        let pinchStartDistance = 0;
+        
+        // Variabili per il calcolo Z (Zoom fisico)
+        let initialHandScale = 0;   // Quanto era grande la mano all'inizio del pinch
+        let initialObjectZ = 0;     // Dov'era l'oggetto all'inizio del pinch
+        
         let explosionFactor = 0;
         let targetExplosion = 0;
 
@@ -148,7 +154,6 @@
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
-        // UI Refs
         const uiState = document.getElementById('current-state');
         const uiPart = document.getElementById('selected-part');
         const loaderUi = document.getElementById('loader');
@@ -161,7 +166,7 @@
 
         loader.load('./modello.glb', (gltf) => {
             const model = gltf.scene;
-            loaderUi.innerText = "Caricamento AI...";
+            loaderUi.innerText = "Preparazione...";
 
             const box = new THREE.Box3().setFromObject(model);
             const center = box.getCenter(new THREE.Vector3());
@@ -187,6 +192,9 @@
                     meshCenter.applyMatrix4(child.matrix); 
 
                     let explodeDir = meshCenter.clone().normalize();
+                    explodeDir.x += (Math.random() - 0.5) * 0.5;
+                    explodeDir.y += (Math.random() - 0.5) * 0.5;
+                    explodeDir.z += (Math.random() - 0.5) * 0.5;
                     explodeDir.normalize().multiplyScalar(105.0); 
 
                     partsData.push({
@@ -197,12 +205,12 @@
                     });
                 }
             });
-            loaderUi.style.display = 'none'; // Nascondi loader solo a fine caricamento 3D
+            loaderUi.style.display = 'none';
 
-        }, undefined, (err) => logError("Errore GLB: " + err.message));
+        }, undefined, (err) => logError(err.message));
 
 
-        // --- 4. GESTIONE MATERIALI ---
+        // --- 4. VISUALIZZAZIONE ---
         function updateMaterials() {
             partsData.forEach(part => {
                 const mesh = part.mesh;
@@ -229,9 +237,8 @@
             });
         }
 
-        // --- 5. MEDIAPIPE & GESTI ---
+        // --- 5. MEDIAPIPE LOGICA ---
         function onResults(results) {
-            // Se non ci sono mani, esci
             if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
                 if (currentState !== STATE.IDLE) changeState(STATE.IDLE);
                 cursorMesh.visible = false;
@@ -243,19 +250,22 @@
             const index = landmarks[8];
             const thumb = landmarks[4];
             const wrist = landmarks[0];
+            const middleBase = landmarks[9]; // Base del dito medio (stabile per calcolo profondità)
 
-            // Calcolo Smooth
+            // CALCOLO POSIZIONE SMOOTH
             const rawX = -( ((index.x + thumb.x)/2) * 2 ) + 1;
             const rawY = -( ((index.y + thumb.y)/2) * 2 ) + 1;
-            const rawZ = wrist.z; 
-
+            
             smoothHand.x += (rawX - smoothHand.x) * SMOOTHING_FACTOR;
             smoothHand.y += (rawY - smoothHand.y) * SMOOTHING_FACTOR;
-            smoothHand.z += (rawZ - smoothHand.z) * SMOOTHING_FACTOR;
-
+            
             const handX = smoothHand.x;
             const handY = smoothHand.y;
-            const handZ = smoothHand.z;
+
+            // CALCOLO PROFONDITÀ GEOMETRICA (Più affidabile di Z)
+            // Distanza apparente tra Polso e Base Medio
+            // Più è grande, più la mano è vicina alla camera
+            const rawScale = Math.hypot(wrist.x - middleBase.x, wrist.y - middleBase.y);
 
             // Cursore
             const vec = new THREE.Vector3(handX, handY, 0.5);
@@ -264,9 +274,9 @@
             const distance = -camera.position.z / dir.z;
             cursorMesh.position.copy(camera.position.clone().add(dir.multiplyScalar(distance)));
 
-            // Logica Gesti
+            // Gesti
             const pinchDist = Math.hypot(index.x - thumb.x, index.y - thumb.y);
-            const PINCH_START = 0.05; // Soglia leggermente aumentata per mobile
+            const PINCH_START = 0.05; 
             const PINCH_RELEASE = 0.12; 
 
             let isPinching = (currentState === STATE.GRAB);
@@ -276,25 +286,46 @@
             let openFingers = 0;
             [8, 12, 16, 20].forEach(tip => { if (landmarks[tip].y < landmarks[tip-2].y) openFingers++; });
 
+            // --- MACCHINA A STATI ---
             if (isPinching) {
                 changeState(STATE.GRAB);
+                
+                // INIZIO PRESA
                 if (!grabbedObject && hoveredObject) {
                     grabbedObject = hoveredObject;
-                    pinchStartDistance = handZ;
+                    
+                    // SALVIAMO LO STATO INIZIALE
+                    initialHandScale = rawScale; // Grandezza mano al momento del click
+                    initialObjectZ = grabbedObject.position.z; // Posizione Z oggetto originale
+                    
                     uiPart.innerText = grabbedObject.name;
                     updateMaterials();
                 }
+
+                // DURANTE LA PRESA
                 if (grabbedObject) {
+                    // 1. Rotazione (Standard)
                     grabbedObject.rotation.y += (handX - targetHand.prevX || 0) * 8; 
                     grabbedObject.rotation.x += (handY - targetHand.prevY || 0) * 8;
-                    const zoomDelta = (handZ - pinchStartDistance) * 25;
-                    let scale = 1 + zoomDelta;
-                    scale = Math.max(0.5, Math.min(6.0, scale)); 
-                    grabbedObject.scale.setScalar(scale);
                     
-                    // Zoom fisico Z
-                    const moveZ = (handZ - pinchStartDistance) * 20;
-                    grabbedObject.position.z = Math.max(-10, Math.min(8, moveZ));
+                    // 2. MOVIMENTO Z (Basato sulla scala della mano)
+                    // Se rawScale aumenta -> Mano si avvicina -> Sposta oggetto verso camera (Z+)
+                    // Se rawScale diminuisce -> Mano si allontana -> Sposta oggetto via (Z-)
+                    
+                    const scaleRatio = rawScale / initialHandScale; 
+                    // Esempio: se ratio è 1.5, la mano è 50% più vicina.
+                    
+                    // Fattore di spostamento (calibrato)
+                    // Se ratio > 1 (avvicino), Z aumenta.
+                    const zOffset = (scaleRatio - 1.0) * 15.0; 
+                    
+                    // Applica rispetto alla posizione che aveva al momento del click
+                    let newZ = initialObjectZ + zOffset;
+                    
+                    // Limiti fisici per non finire dietro la camera o all'infinito
+                    newZ = Math.max(-20, Math.min(8, newZ));
+                    
+                    grabbedObject.position.z = newZ;
                 }
 
             } else if (openFingers >= 3) {
@@ -306,10 +337,12 @@
             } else {
                 if (grabbedObject) releaseObject();
                 changeState(STATE.IDLE);
+                // Rotazione anche in IDLE (Invertita come richiesto)
                 pivotGroup.rotation.y -= (handX - (targetHand.prevX || 0)) * 2;
                 pivotGroup.rotation.x -= (handY - (targetHand.prevY || 0)) * 2;
             }
 
+            // Raycast
             if (!grabbedObject) {
                 mouse.x = handX;
                 mouse.y = handY;
@@ -330,6 +363,7 @@
                     }
                 }
             }
+
             targetHand.prevX = handX;
             targetHand.prevY = handY;
         }
@@ -374,15 +408,16 @@
             if (partsData.length > 0) {
                 partsData.forEach(part => {
                     if (grabbedObject === part.mesh) return;
+                    
                     let targetPos = (currentState === STATE.EXPLODE) ? 
                         part.originalPos.clone().add(part.explodeVector.clone().multiplyScalar(explosionFactor)) : 
                         part.originalPos;
 
                     part.mesh.position.lerp(targetPos, 0.1);
                     part.mesh.quaternion.slerp(part.originalRot, 0.1);
-                    part.mesh.scale.lerp(new THREE.Vector3(1, 1, 1), 0.1);
-                    // Reset Z fisico
-                    if(part.mesh.position.z !== targetPos.z && currentState !== STATE.GRAB) {
+                    
+                    // Reset Z graduale
+                    if(Math.abs(part.mesh.position.z - targetPos.z) > 0.01) {
                          part.mesh.position.z += (targetPos.z - part.mesh.position.z) * 0.1;
                     }
                 });
@@ -391,25 +426,17 @@
         }
         animate();
 
-        // --- SETUP CAMERA MEDIAPIPE (IOS FRIENDLY) ---
+        // --- CAMERA SETUP ---
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
         hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
         hands.onResults(onResults);
 
         const videoElem = document.getElementById('input-video');
-        
-        // Configurazione specifica per compatibilità mobile
         const cameraUtils = new Camera(videoElem, {
             onFrame: async () => { await hands.send({image: videoElem}); },
-            width: 1280, // Richiedi HD, spesso aiuta iOS a scegliere la camera giusta
-            height: 720,
-            facingMode: 'user' // FONDAMENTALE: Richiede camera frontale
+            width: 1280, height: 720, facingMode: 'user'
         });
-        
-        // Avvio protetto
-        cameraUtils.start().catch(err => {
-            logError("Errore Camera: " + err);
-        });
+        cameraUtils.start().catch(err => logError(err));
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
