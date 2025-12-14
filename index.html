@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Anatomy Pro - Perfect Pinch</title>
+    <title>Anatomy Pro - Absolute Zoom</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', sans-serif; }
         
@@ -76,7 +76,7 @@
         <h2>Anatomy Controller</h2>
         <div class="status-row" id="row-idle"><div class="status-icon">✊</div> Chiusa: Ruota Tutto</div>
         <div class="status-row" id="row-explode"><div class="status-icon">🖐️</div> Aperta: Esplodi (Drag)</div>
-        <div class="status-row" id="row-grab"><div class="status-icon">👌</div> Pinch: Muovi Z</div>
+        <div class="status-row" id="row-grab"><div class="status-icon">👌</div> Pinch: Zoom Z (Reale)</div>
         
         <div id="current-state" class="st-idle">ATTESA</div>
         <div id="selected-part">...</div>
@@ -140,9 +140,9 @@
         let grabbedObject = null;
         let hoveredObject = null;
         
-        // Variabili per il calcolo Z (Zoom fisico)
-        let initialHandScale = 0;   // Quanto era grande la mano all'inizio del pinch
-        let initialObjectZ = 0;     // Dov'era l'oggetto all'inizio del pinch
+        // VARIABILI ZOOM FISICO (FIXED)
+        let initialHandScale = 0;   
+        let initialObjectPos = new THREE.Vector3(); // Salviamo la posizione VERA (Vector3)
         
         let explosionFactor = 0;
         let targetExplosion = 0;
@@ -250,7 +250,7 @@
             const index = landmarks[8];
             const thumb = landmarks[4];
             const wrist = landmarks[0];
-            const middleBase = landmarks[9]; // Base del dito medio (stabile per calcolo profondità)
+            const middleBase = landmarks[9]; 
 
             // CALCOLO POSIZIONE SMOOTH
             const rawX = -( ((index.x + thumb.x)/2) * 2 ) + 1;
@@ -262,9 +262,7 @@
             const handX = smoothHand.x;
             const handY = smoothHand.y;
 
-            // CALCOLO PROFONDITÀ GEOMETRICA (Più affidabile di Z)
-            // Distanza apparente tra Polso e Base Medio
-            // Più è grande, più la mano è vicina alla camera
+            // CALCOLO DISTANZA MANO (Geometrica)
             const rawScale = Math.hypot(wrist.x - middleBase.x, wrist.y - middleBase.y);
 
             // Cursore
@@ -294,9 +292,9 @@
                 if (!grabbedObject && hoveredObject) {
                     grabbedObject = hoveredObject;
                     
-                    // SALVIAMO LO STATO INIZIALE
-                    initialHandScale = rawScale; // Grandezza mano al momento del click
-                    initialObjectZ = grabbedObject.position.z; // Posizione Z oggetto originale
+                    // SAVE STATE
+                    initialHandScale = rawScale; 
+                    initialObjectPos.copy(grabbedObject.position); // Salva posizione Vettoriale precisa
                     
                     uiPart.innerText = grabbedObject.name;
                     updateMaterials();
@@ -308,24 +306,26 @@
                     grabbedObject.rotation.y += (handX - targetHand.prevX || 0) * 8; 
                     grabbedObject.rotation.x += (handY - targetHand.prevY || 0) * 8;
                     
-                    // 2. MOVIMENTO Z (Basato sulla scala della mano)
-                    // Se rawScale aumenta -> Mano si avvicina -> Sposta oggetto verso camera (Z+)
-                    // Se rawScale diminuisce -> Mano si allontana -> Sposta oggetto via (Z-)
-                    
+                    // 2. ZOOM REALE (Vettoriale e Globale)
+                    // Calcolo quanto la mano si è allontanata/avvicinata rispetto allo start
+                    // Mano piccola (Lontana) -> scaleRatio < 1 -> Vogliamo Zoom IN
                     const scaleRatio = rawScale / initialHandScale; 
-                    // Esempio: se ratio è 1.5, la mano è 50% più vicina.
                     
-                    // Fattore di spostamento (calibrato)
-                    // Se ratio > 1 (avvicino), Z aumenta.
-                    const zOffset = (scaleRatio - 1.0) * 15.0; 
+                    // Invertiamo logica: ratio piccolo = Z aumenta (avvicina)
+                    // Moltiplicatore 25.0 per reattività
+                    const zOffset = (1.0 - scaleRatio) * 25.0;
                     
-                    // Applica rispetto alla posizione che aveva al momento del click
-                    let newZ = initialObjectZ + zOffset;
+                    // CALCOLO MATEMATICO CORRETTO PER LO ZOOM INDIPENDENTE DALLA ROTAZIONE DEL CUORE
+                    // Creiamo un vettore che punta verso la camera (Asse Z globale)
+                    const globalMove = new THREE.Vector3(0, 0, zOffset);
                     
-                    // Limiti fisici per non finire dietro la camera o all'infinito
-                    newZ = Math.max(-20, Math.min(8, newZ));
+                    // Applichiamo la rotazione inversa del gruppo padre al vettore
+                    // Questo fa sì che "Z" sia sempre "Verso lo schermo", non "Verso l'alto del cuore"
+                    globalMove.applyQuaternion(pivotGroup.quaternion.clone().invert());
                     
-                    grabbedObject.position.z = newZ;
+                    // Applichiamo il movimento relativo alla posizione salvata all'inizio
+                    // (Senza questo, l'oggetto scapperebbe via sommando errori)
+                    grabbedObject.position.copy(initialObjectPos).add(globalMove);
                 }
 
             } else if (openFingers >= 3) {
@@ -337,7 +337,7 @@
             } else {
                 if (grabbedObject) releaseObject();
                 changeState(STATE.IDLE);
-                // Rotazione anche in IDLE (Invertita come richiesto)
+                // Rotazione in IDLE
                 pivotGroup.rotation.y -= (handX - (targetHand.prevX || 0)) * 2;
                 pivotGroup.rotation.x -= (handY - (targetHand.prevY || 0)) * 2;
             }
@@ -408,18 +408,13 @@
             if (partsData.length > 0) {
                 partsData.forEach(part => {
                     if (grabbedObject === part.mesh) return;
-                    
                     let targetPos = (currentState === STATE.EXPLODE) ? 
                         part.originalPos.clone().add(part.explodeVector.clone().multiplyScalar(explosionFactor)) : 
                         part.originalPos;
 
                     part.mesh.position.lerp(targetPos, 0.1);
                     part.mesh.quaternion.slerp(part.originalRot, 0.1);
-                    
-                    // Reset Z graduale
-                    if(Math.abs(part.mesh.position.z - targetPos.z) > 0.01) {
-                         part.mesh.position.z += (targetPos.z - part.mesh.position.z) * 0.1;
-                    }
+                    part.mesh.scale.lerp(new THREE.Vector3(1, 1, 1), 0.1);
                 });
             }
             renderer.render(scene, camera);
@@ -432,10 +427,12 @@
         hands.onResults(onResults);
 
         const videoElem = document.getElementById('input-video');
+        
         const cameraUtils = new Camera(videoElem, {
             onFrame: async () => { await hands.send({image: videoElem}); },
             width: 1280, height: 720, facingMode: 'user'
         });
+        
         cameraUtils.start().catch(err => logError(err));
 
         window.addEventListener('resize', () => {
