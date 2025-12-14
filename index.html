@@ -2,47 +2,55 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Anatomy Pro - Final Ultimate</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Anatomy Pro - iOS Fix</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', sans-serif; }
         
         #ui {
-            position: absolute; top: 20px; left: 20px; z-index: 10;
-            color: white; background: rgba(0,0,0,0.85); padding: 20px; 
+            position: absolute; top: 10px; left: 10px; z-index: 10;
+            color: white; background: rgba(0,0,0,0.85); padding: 15px; 
             border-radius: 12px; border-left: 4px solid #00d2ff;
-            min-width: 260px; backdrop-filter: blur(8px);
+            max-width: 200px; backdrop-filter: blur(8px);
             pointer-events: none;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            font-size: 0.8rem; /* Più piccolo per mobile */
         }
-        h2 { margin: 0 0 10px 0; font-size: 1.2rem; text-transform: uppercase; color: #00d2ff; letter-spacing: 1px; }
+        h2 { margin: 0 0 5px 0; font-size: 1rem; text-transform: uppercase; color: #00d2ff; }
         
-        .status-row { display: flex; align-items: center; margin-bottom: 8px; font-size: 0.9rem; color: #aaa; }
-        .status-icon { width: 25px; text-align: center; margin-right: 10px; font-weight: bold; font-size: 1.1rem; }
-        .active { color: #fff; text-shadow: 0 0 10px white; font-weight: bold; }
+        .status-row { display: flex; align-items: center; margin-bottom: 5px; color: #aaa; }
+        .active { color: #fff; font-weight: bold; }
 
         #current-state {
-            margin-top: 15px; padding: 10px; background: #222; border-radius: 6px;
-            text-align: center; font-weight: bold; font-size: 1.1rem; border: 1px solid #444;
-            transition: all 0.3s;
+            margin-top: 10px; padding: 5px; background: #222; border-radius: 4px;
+            text-align: center; font-weight: bold; border: 1px solid #444;
         }
-        .st-idle { color: #888; border-color: #888; }
-        .st-explode { color: #00d2ff; border-color: #00d2ff; background: rgba(0, 210, 255, 0.1); }
-        .st-grab { color: #ff0055; border-color: #ff0055; background: rgba(255, 0, 85, 0.1); box-shadow: 0 0 20px rgba(255,0,85,0.4); }
+        .st-idle { color: #888; }
+        .st-explode { color: #00d2ff; }
+        .st-grab { color: #ff0055; }
 
-        #selected-part { color: #ffff00; font-weight: bold; margin-top: 5px; min-height: 1.2em; text-align: center; }
+        #selected-part { color: #ffff00; font-weight: bold; margin-top: 5px; text-align: center; }
+
+        /* Console Errori Visiva per Mobile */
+        #debug-console {
+            position: absolute; bottom: 0; left: 0; width: 100%; max-height: 100px;
+            background: rgba(50,0,0,0.8); color: #ffaaaa; font-family: monospace;
+            font-size: 10px; overflow-y: scroll; z-index: 999; pointer-events: none;
+            display: none; /* Appare solo se ci sono errori */
+        }
 
         #video-container {
-            position: absolute; bottom: 20px; left: 20px; z-index: 5;
-            width: 240px; height: 180px; border-radius: 12px; overflow: hidden;
+            position: absolute; bottom: 20px; right: 20px; z-index: 5;
+            width: 120px; height: 160px; border-radius: 12px; overflow: hidden;
             border: 2px solid #333; transform: scaleX(-1); opacity: 0.5;
         }
+        /* FIX IMPORTANTE PER IOS: Video deve riempire il container */
         video { width: 100%; height: 100%; object-fit: cover; }
 
         #loader {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            color: #00d2ff; font-size: 1.5rem; font-weight: bold;
-            background: #111; padding: 40px; border: 1px solid #00d2ff; border-radius: 50%;
-            width: 200px; height: 200px; display: flex; align-items: center; justify-content: center;
+            color: #00d2ff; font-size: 1.2rem; font-weight: bold;
+            background: #111; padding: 30px; border: 1px solid #00d2ff; border-radius: 50%;
+            width: 150px; height: 150px; display: flex; align-items: center; justify-content: center;
             box-shadow: 0 0 50px rgba(0, 210, 255, 0.2); z-index: 100; text-align: center;
         }
     </style>
@@ -60,19 +68,22 @@
 </head>
 <body>
 
-    <div id="loader">Caricamento<br>Sistema...</div>
+    <div id="loader">Avvio<br>Camera...</div>
+    <div id="debug-console"></div>
 
     <div id="ui">
-        <h2>Controllo Totale</h2>
-        <div class="status-row" id="row-idle"><div class="status-icon">✊</div> Chiusa: Ruota Tutto</div>
-        <div class="status-row" id="row-explode"><div class="status-icon">🖐️</div> Aperta: Esplosione Max</div>
-        <div class="status-row" id="row-grab"><div class="status-icon">👌</div> Pinch: Prendi & Tira</div>
+        <h2>Mobile Controller</h2>
+        <div class="status-row" id="row-idle">✊ Unisci</div>
+        <div class="status-row" id="row-explode">🖐️ Esplodi</div>
+        <div class="status-row" id="row-grab">👌 Zoom/Pinch</div>
         
         <div id="current-state" class="st-idle">ATTESA</div>
         <div id="selected-part">...</div>
     </div>
 
-    <div id="video-container"><video id="input-video"></video></div>
+    <div id="video-container">
+        <video id="input-video" playsinline webkit-playsinline muted autoplay></video>
+    </div>
     <div id="canvas-container"></div>
 
     <script type="module">
@@ -80,33 +91,38 @@
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
+        // --- SISTEMA DI LOGGING PER MOBILE ---
+        function logError(msg) {
+            const consoleDiv = document.getElementById('debug-console');
+            consoleDiv.style.display = 'block';
+            consoleDiv.innerHTML += `<div>> ${msg}</div>`;
+            console.error(msg);
+        }
+        window.onerror = function(message, source, lineno, colno, error) {
+            logError(message);
+        };
+
         // --- 1. SETUP AMBIENTE ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x050505);
-        scene.fog = new THREE.FogExp2(0x050505, 0.015); 
         
         const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 300);
-        camera.position.set(0, 0, 12); 
+        camera.position.set(0, 0, 14); // Leggermente più lontano per schermi piccoli
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.1;
         document.body.appendChild(renderer.domElement);
 
         // Luci
-        scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.4));
         const mainLight = new THREE.DirectionalLight(0xffffff, 2);
         mainLight.position.set(5, 5, 5);
         scene.add(mainLight);
-        const rimLight = new THREE.SpotLight(0x00d2ff, 5);
-        rimLight.position.set(-5, 5, -2);
-        scene.add(rimLight);
 
         const pivotGroup = new THREE.Group();
         scene.add(pivotGroup);
 
-        // Cursore
         const cursorMesh = new THREE.Mesh(
             new THREE.SphereGeometry(0.05, 16, 16),
             new THREE.MeshBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0.8, depthTest: false })
@@ -114,23 +130,17 @@
         cursorMesh.renderOrder = 999; 
         scene.add(cursorMesh);
 
-
-        // --- 2. DATI LOGICI ---
+        // --- 2. LOGICA ---
         let partsData = [];
-        let originalMaterials = new Map();
-        
         const STATE = { IDLE: 'idle', EXPLODE: 'explode', GRAB: 'grab' };
         let currentState = STATE.IDLE;
         
         let grabbedObject = null;
         let hoveredObject = null;
         let pinchStartDistance = 0;
-        
-        // Esplosione
         let explosionFactor = 0;
         let targetExplosion = 0;
 
-        // Smoothing
         let targetHand = { x: 0, y: 0, z: 0 }; 
         let smoothHand = { x: 0, y: 0, z: 0 }; 
         const SMOOTHING_FACTOR = 0.15; 
@@ -151,9 +161,8 @@
 
         loader.load('./modello.glb', (gltf) => {
             const model = gltf.scene;
-            loaderUi.style.display = 'none';
+            loaderUi.innerText = "Caricamento AI...";
 
-            // Scala e Centro
             const box = new THREE.Box3().setFromObject(model);
             const center = box.getCenter(new THREE.Vector3());
             const size = box.getSize(new THREE.Vector3());
@@ -164,32 +173,20 @@
             pivotGroup.scale.set(scale, scale, scale);
             pivotGroup.add(model);
 
-            // Setup Parti
             let index = 0;
             model.traverse((child) => {
                 if (child.isMesh) {
-                    child.castShadow = true;
-                    child.receiveShadow = true;
-                    
                     child.material = child.material.clone();
                     child.material.transparent = true; 
                     child.material.opacity = 1.0;
                     
-                    originalMaterials.set(child.uuid, child.material.clone());
-
                     if (!child.name) child.name = "Parte_" + index++;
 
-                    // Calcolo Vettore Esplosione
                     child.geometry.computeBoundingSphere();
                     const meshCenter = child.geometry.boundingSphere.center.clone();
                     meshCenter.applyMatrix4(child.matrix); 
 
                     let explodeDir = meshCenter.clone().normalize();
-                    explodeDir.x += (Math.random() - 0.5) * 0.5; // Noise
-                    explodeDir.y += (Math.random() - 0.5) * 0.5;
-                    explodeDir.z += (Math.random() - 0.5) * 0.5;
-                    
-                    // ESPLOSIONE MAX (105.0)
                     explodeDir.normalize().multiplyScalar(105.0); 
 
                     partsData.push({
@@ -200,11 +197,12 @@
                     });
                 }
             });
+            loaderUi.style.display = 'none'; // Nascondi loader solo a fine caricamento 3D
 
-        }, undefined, (err) => console.error(err));
+        }, undefined, (err) => logError("Errore GLB: " + err.message));
 
 
-        // --- 4. GESTIONE VISIVA ---
+        // --- 4. GESTIONE MATERIALI ---
         function updateMaterials() {
             partsData.forEach(part => {
                 const mesh = part.mesh;
@@ -214,32 +212,26 @@
 
                 if (currentState === STATE.GRAB && grabbedObject) {
                     if (isGrabbed) {
-                        mat.opacity = 1.0;
-                        mat.visible = true;
-                        mat.emissive.setHex(0x550000); 
+                        mat.opacity = 1.0; mat.visible = true; mat.emissive.setHex(0x550000); 
                     } else {
-                        mat.opacity = 0.0; 
-                        mat.visible = false; 
+                        mat.opacity = 0.0; mat.visible = false; 
                     }
                 } else if (currentState === STATE.EXPLODE) {
                     mat.visible = true;
                     if (isHovered) {
-                        mat.opacity = 1.0;
-                        mat.emissive.setHex(0x333333); 
+                        mat.opacity = 1.0; mat.emissive.setHex(0x333333); 
                     } else {
-                        mat.opacity = 0.2; 
-                        mat.emissive.setHex(0x000000);
+                        mat.opacity = 0.2; mat.emissive.setHex(0x000000);
                     }
                 } else {
-                    mat.visible = true;
-                    mat.opacity = 1.0;
-                    mat.emissive.setHex(0x000000);
+                    mat.visible = true; mat.opacity = 1.0; mat.emissive.setHex(0x000000);
                 }
             });
         }
 
-        // --- 5. LOGICA HAND TRACKING ---
+        // --- 5. MEDIAPIPE & GESTI ---
         function onResults(results) {
+            // Se non ci sono mani, esci
             if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
                 if (currentState !== STATE.IDLE) changeState(STATE.IDLE);
                 cursorMesh.visible = false;
@@ -252,12 +244,11 @@
             const thumb = landmarks[4];
             const wrist = landmarks[0];
 
-            // 1. Calcolo RAW Target
+            // Calcolo Smooth
             const rawX = -( ((index.x + thumb.x)/2) * 2 ) + 1;
             const rawY = -( ((index.y + thumb.y)/2) * 2 ) + 1;
             const rawZ = wrist.z; 
 
-            // 2. APPLICAZIONE SMOOTHING
             smoothHand.x += (rawX - smoothHand.x) * SMOOTHING_FACTOR;
             smoothHand.y += (rawY - smoothHand.y) * SMOOTHING_FACTOR;
             smoothHand.z += (rawZ - smoothHand.z) * SMOOTHING_FACTOR;
@@ -266,16 +257,16 @@
             const handY = smoothHand.y;
             const handZ = smoothHand.z;
 
-            // Update Cursore
+            // Cursore
             const vec = new THREE.Vector3(handX, handY, 0.5);
             vec.unproject(camera);
             const dir = vec.sub(camera.position).normalize();
             const distance = -camera.position.z / dir.z;
             cursorMesh.position.copy(camera.position.clone().add(dir.multiplyScalar(distance)));
 
-            // Rilevamento Gesti
+            // Logica Gesti
             const pinchDist = Math.hypot(index.x - thumb.x, index.y - thumb.y);
-            const PINCH_START = 0.04; 
+            const PINCH_START = 0.05; // Soglia leggermente aumentata per mobile
             const PINCH_RELEASE = 0.12; 
 
             let isPinching = (currentState === STATE.GRAB);
@@ -285,63 +276,50 @@
             let openFingers = 0;
             [8, 12, 16, 20].forEach(tip => { if (landmarks[tip].y < landmarks[tip-2].y) openFingers++; });
 
-            // STATI
             if (isPinching) {
                 changeState(STATE.GRAB);
-                
                 if (!grabbedObject && hoveredObject) {
                     grabbedObject = hoveredObject;
                     pinchStartDistance = handZ;
-                    uiPart.innerText = "PRESA: " + grabbedObject.name;
+                    uiPart.innerText = grabbedObject.name;
                     updateMaterials();
                 }
-
                 if (grabbedObject) {
-                    // 1. ROTAZIONE: Segue la mano
                     grabbedObject.rotation.y += (handX - targetHand.prevX || 0) * 8; 
                     grabbedObject.rotation.x += (handY - targetHand.prevY || 0) * 8;
+                    const zoomDelta = (handZ - pinchStartDistance) * 25;
+                    let scale = 1 + zoomDelta;
+                    scale = Math.max(0.5, Math.min(6.0, scale)); 
+                    grabbedObject.scale.setScalar(scale);
                     
-                    // 2. ZOOM REALE (TRASLAZIONE Z)
-                    // Logica: Se handZ aumenta (ti allontani), sposta oggetto su Z positivo (verso camera)
-                    // Moltiplicatore alto (x20) per rendere il movimento evidente
+                    // Zoom fisico Z
                     const moveZ = (handZ - pinchStartDistance) * 20;
-                    
-                    // Spostiamo l'oggetto dalla sua posizione originale verso la camera
-                    // Limitiamo il movimento per non farlo uscire troppo o finire dietro
-                    // Z originale è circa 0. Camera è a 12.
-                    const newZ = Math.max(-10, Math.min(8, moveZ)); 
-                    grabbedObject.position.z = newZ;
+                    grabbedObject.position.z = Math.max(-10, Math.min(8, moveZ));
                 }
 
             } else if (openFingers >= 3) {
                 if (grabbedObject) releaseObject();
                 changeState(STATE.EXPLODE);
-                
-                // ROTAZIONE GLOBALE INVERTITA (Drag)
                 pivotGroup.rotation.y -= (handX - (targetHand.prevX || 0)) * 2;
                 pivotGroup.rotation.x -= (handY - (targetHand.prevY || 0)) * 2;
                 
             } else {
                 if (grabbedObject) releaseObject();
                 changeState(STATE.IDLE);
-                
-                // NUOVO: ROTAZIONE ANCHE DA CHIUSO (Drag Invertito come esplosione)
                 pivotGroup.rotation.y -= (handX - (targetHand.prevX || 0)) * 2;
                 pivotGroup.rotation.x -= (handY - (targetHand.prevY || 0)) * 2;
             }
 
-            // Raycasting
             if (!grabbedObject) {
                 mouse.x = handX;
                 mouse.y = handY;
                 raycaster.setFromCamera(mouse, camera);
                 const intersects = raycaster.intersectObjects(pivotGroup.children, true);
-                
                 if (intersects.length > 0) {
                     const obj = intersects[0].object;
                     if (hoveredObject !== obj) {
                         hoveredObject = obj;
-                        uiPart.innerText = "Punta su: " + obj.name;
+                        uiPart.innerText = obj.name;
                         if (currentState === STATE.EXPLODE) updateMaterials();
                     }
                 } else {
@@ -352,7 +330,6 @@
                     }
                 }
             }
-
             targetHand.prevX = handX;
             targetHand.prevY = handY;
         }
@@ -378,7 +355,7 @@
                 document.getElementById('row-idle').classList.add('active');
             } else if (newState === STATE.EXPLODE) {
                 targetExplosion = 1;
-                uiState.innerText = "ESPLOSIONE MAX";
+                uiState.innerText = "ESPLOSIONE";
                 uiState.classList.add('st-explode');
                 document.getElementById('row-explode').classList.add('active');
             } else if (newState === STATE.GRAB) {
@@ -392,47 +369,47 @@
         // --- 6. ANIMAZIONE ---
         function animate() {
             requestAnimationFrame(animate);
-
             explosionFactor += (targetExplosion - explosionFactor) * 0.1;
 
             if (partsData.length > 0) {
                 partsData.forEach(part => {
-                    // SE QUESTO PEZZO È AFFERRATO, non animarlo, lo controlla la mano
                     if (grabbedObject === part.mesh) return;
+                    let targetPos = (currentState === STATE.EXPLODE) ? 
+                        part.originalPos.clone().add(part.explodeVector.clone().multiplyScalar(explosionFactor)) : 
+                        part.originalPos;
 
-                    let targetPos;
-                    if (currentState === STATE.EXPLODE) {
-                        targetPos = part.originalPos.clone().add(
-                            part.explodeVector.clone().multiplyScalar(explosionFactor)
-                        );
-                    } else {
-                        // IDLE: Torna a casa
-                        targetPos = part.originalPos;
-                    }
-
-                    // Lerp per ritorno dolce
                     part.mesh.position.lerp(targetPos, 0.1);
                     part.mesh.quaternion.slerp(part.originalRot, 0.1);
-                    // Ritorno scala a 1 (nel caso fosse stato zoomato)
                     part.mesh.scale.lerp(new THREE.Vector3(1, 1, 1), 0.1);
+                    // Reset Z fisico
+                    if(part.mesh.position.z !== targetPos.z && currentState !== STATE.GRAB) {
+                         part.mesh.position.z += (targetPos.z - part.mesh.position.z) * 0.1;
+                    }
                 });
             }
-
             renderer.render(scene, camera);
         }
         animate();
 
-        // Setup Hands
+        // --- SETUP CAMERA MEDIAPIPE (IOS FRIENDLY) ---
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 }); 
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
         hands.onResults(onResults);
 
         const videoElem = document.getElementById('input-video');
-        const camUtils = new Camera(videoElem, {
+        
+        // Configurazione specifica per compatibilità mobile
+        const cameraUtils = new Camera(videoElem, {
             onFrame: async () => { await hands.send({image: videoElem}); },
-            width: 640, height: 480
+            width: 1280, // Richiedi HD, spesso aiuta iOS a scegliere la camera giusta
+            height: 720,
+            facingMode: 'user' // FONDAMENTALE: Richiede camera frontale
         });
-        camUtils.start();
+        
+        // Avvio protetto
+        cameraUtils.start().catch(err => {
+            logError("Errore Camera: " + err);
+        });
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
